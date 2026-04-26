@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { NextRequest, NextResponse } from "next/server";
 import type { DashboardMetricsResponse } from "@/lib/types";
 import { BACKEND_API_URL } from "@/lib/config";
@@ -5,6 +6,17 @@ import { BACKEND_API_URL } from "@/lib/config";
 export async function GET(request: NextRequest) {
   try {
     const response = await fetch(`${BACKEND_API_URL}/dashboard/metrics${request.nextUrl.search}`, {
+=======
+import { NextResponse } from "next/server";
+import type { DashboardMetricsResponse } from "@/lib/types";
+
+const BACKEND_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+
+export async function GET() {
+  try {
+    const response = await fetch(`${BACKEND_BASE_URL}/api/dashboard/metrics`, {
+>>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
       method: "GET",
       cache: "no-store",
     });
@@ -20,7 +32,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data, { status: 200 });
   } catch {
     return NextResponse.json(
+<<<<<<< HEAD
       { message: "Could not reach backend API (NEXT_PUBLIC_API_URL)" },
+=======
+      { message: "Could not reach backend on localhost:8000" },
+>>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
       { status: 502 },
     );
   }

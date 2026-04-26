@@ -1,5 +1,8 @@
 export type DecimalString = string;
+<<<<<<< HEAD
 export type TenantStatus = "Overdue" | "Settled";
+=======
+>>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
 
 export type TransactionType = "INFLOW" | "OUTFLOW";
 
@@ -10,6 +13,7 @@ export type TransactionCategory =
   | "other";
 
 export interface DashboardMetricsResponse {
+<<<<<<< HEAD
   total_revenue?: DecimalString;
   treasury_balance?: DecimalString;
   total_overdues?: DecimalString;
@@ -24,6 +28,12 @@ export interface DashboardMetricsResponse {
   total_expected_maintenance?: DecimalString;
   maintenanceReceivedThisMonth?: DecimalString;
   maintenanceExpectedTotal?: DecimalString;
+=======
+  total_revenue: DecimalString;
+  treasury_balance: DecimalString;
+  total_overdues: DecimalString;
+  ad_revenue: DecimalString;
+>>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
 }
 
 export interface Unit {
@@ -35,6 +45,7 @@ export interface Unit {
 export interface Occupant {
   id: number;
   name: string;
+<<<<<<< HEAD
   contact?: string | null;
   phone?: string | null;
   email?: string | null;
@@ -61,6 +72,14 @@ export interface ReceiptResponse {
   receipt_no: string;
 }
 
+=======
+  monthly_maintenance_fee: DecimalString;
+  last_paid_month: string | null;
+  expected_dues: DecimalString;
+  unit: Unit;
+}
+
+>>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
 export interface Transaction {
   id: number;
   occupant_id: number | null;
@@ -70,6 +89,7 @@ export interface Transaction {
   type: TransactionType;
   category: TransactionCategory;
   notes: string | null;
+<<<<<<< HEAD
   maintenance_month?: string | null;
   maintenanceMonth?: string | null;
   created_at?: string | null;
@@ -77,6 +97,8 @@ export interface Transaction {
   generated_by?: string | null;
   generatedBy?: string | null;
   source?: string | null;
+=======
+>>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
 }
 
 export interface CreateTransactionPayload {
