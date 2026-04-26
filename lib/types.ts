@@ -1,4 +1,5 @@
 export type DecimalString = string;
+export type TenantStatus = "Overdue" | "Settled";
 
 export type TransactionType = "INFLOW" | "OUTFLOW";
 
@@ -9,10 +10,20 @@ export type TransactionCategory =
   | "other";
 
 export interface DashboardMetricsResponse {
-  total_revenue: DecimalString;
-  treasury_balance: DecimalString;
-  total_overdues: DecimalString;
-  ad_revenue: DecimalString;
+  total_revenue?: DecimalString;
+  treasury_balance?: DecimalString;
+  total_overdues?: DecimalString;
+  ad_revenue?: DecimalString;
+  totalRevenue?: DecimalString;
+  treasuryBalance?: DecimalString;
+  totalOverdueAmount?: DecimalString;
+  allTimeAdRevenue?: DecimalString;
+  overdue_units?: string[];
+  missingApartments?: string[];
+  maintenance_received?: DecimalString;
+  total_expected_maintenance?: DecimalString;
+  maintenanceReceivedThisMonth?: DecimalString;
+  maintenanceExpectedTotal?: DecimalString;
 }
 
 export interface Unit {
@@ -24,10 +35,30 @@ export interface Unit {
 export interface Occupant {
   id: number;
   name: string;
+  contact?: string | null;
+  phone?: string | null;
+  email?: string | null;
   monthly_maintenance_fee: DecimalString;
   last_paid_month: string | null;
+  due_month?: string | null;
   expected_dues: DecimalString;
+  status?: TenantStatus;
+  hasPastDues?: boolean;
+  unpaidPastMonths?: string[];
+  paidMonths?: string[];
+  paid_months?: string[];
   unit: Unit;
+}
+
+export interface ReceiptPayload {
+  occupant_id: number;
+  month: string;
+  amount: DecimalString;
+}
+
+export interface ReceiptResponse {
+  id: number;
+  receipt_no: string;
 }
 
 export interface Transaction {
@@ -39,6 +70,13 @@ export interface Transaction {
   type: TransactionType;
   category: TransactionCategory;
   notes: string | null;
+  maintenance_month?: string | null;
+  maintenanceMonth?: string | null;
+  created_at?: string | null;
+  timestamp?: string | null;
+  generated_by?: string | null;
+  generatedBy?: string | null;
+  source?: string | null;
 }
 
 export interface CreateTransactionPayload {

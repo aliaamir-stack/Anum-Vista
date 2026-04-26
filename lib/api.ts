@@ -2,10 +2,13 @@ import type {
   CreateTransactionPayload,
   DashboardMetricsResponse,
   Occupant,
+  ReceiptPayload,
+  ReceiptResponse,
   Transaction,
 } from "./types";
+import { FRONTEND_API_BASE } from "./config";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE_URL = FRONTEND_API_BASE;
 
 const buildUrl = (path: string): string => `${API_BASE_URL}${path}`;
 
@@ -29,23 +32,42 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export const api = {
-  getDashboardMetrics: (): Promise<DashboardMetricsResponse> =>
-    fetchJson<DashboardMetricsResponse>("/api/dashboard/metrics"),
+const withQuery = (
+  path: string,
+  params?: Record<string, string | number | undefined>,
+): string => {
+  if (!params) return path;
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined) query.set(key, String(value));
+  });
+  const serialized = query.toString();
+  return serialized ? `${path}?${serialized}` : path;
+};
 
-  getTenants: (): Promise<Occupant[]> => fetchJson<Occupant[]>("/api/tenants"),
+export const api = {
+  getDashboardMetrics: (month?: string, year?: string): Promise<DashboardMetricsResponse> =>
+    fetchJson<DashboardMetricsResponse>(withQuery("/dashboard/metrics", { month, year })),
+
+  getTenants: (): Promise<Occupant[]> => fetchJson<Occupant[]>("/tenants"),
 
   getTransactions: (): Promise<Transaction[]> =>
-    fetchJson<Transaction[]>("/api/transactions"),
+    fetchJson<Transaction[]>("/transactions"),
 
   createTransaction: (payload: CreateTransactionPayload): Promise<Transaction> => {
     if (!payload.date.includes("T")) {
       throw new Error("Transaction date must be a full ISO datetime string.");
     }
 
-    return fetchJson<Transaction>("/api/transactions", {
+    return fetchJson<Transaction>("/transactions", {
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
+
+  createReceipt: (payload: ReceiptPayload): Promise<ReceiptResponse> =>
+    fetchJson<ReceiptResponse>("/receipts", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 };

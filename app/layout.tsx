@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { Providers } from "./providers";
 
 export const metadata: Metadata = {
   title: "Anum Vista",
@@ -49,7 +50,7 @@ export default function RootLayout({
           </aside>
 
           <main className="min-h-screen flex-1 bg-[#f5f6fa] p-8">
-            {children}
+            <Providers>{children}</Providers>
           </main>
         </div>
       </body>

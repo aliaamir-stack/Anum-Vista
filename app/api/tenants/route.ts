@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { DashboardMetricsResponse } from "@/lib/types";
+import type { Occupant } from "@/lib/types";
 import { BACKEND_API_URL } from "@/lib/config";
 
 export async function GET(request: NextRequest) {
   try {
-    const response = await fetch(`${BACKEND_API_URL}/dashboard/metrics${request.nextUrl.search}`, {
+    const response = await fetch(`${BACKEND_API_URL}/tenants${request.nextUrl.search}`, {
       method: "GET",
       cache: "no-store",
     });
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const data = (await response.json()) as DashboardMetricsResponse;
+    const data = (await response.json()) as Occupant[];
     return NextResponse.json(data, { status: 200 });
   } catch {
     return NextResponse.json(
