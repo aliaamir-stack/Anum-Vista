@@ -1,7 +1,10 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Enum, Numeric
 from sqlalchemy.orm import relationship
 import enum
-from database import Base
+try:
+    from backend.database import Base
+except ImportError:
+    from database import Base
 from datetime import datetime
 
 class UnitType(str, enum.Enum):
@@ -35,6 +38,8 @@ class Occupant(Base):
     name = Column(String, index=True)
     unit_id = Column(Integer, ForeignKey("units.id"))
     monthly_maintenance_fee = Column(Numeric(10, 2), default=0.0)
+    car_count = Column(Integer, nullable=False, default=1)
+    extra_car_maintenance_fee = Column(Numeric(10, 2), nullable=False, default=0.0)
     last_paid_month = Column(DateTime, nullable=True) # Tracks the latest month they have fully paid till
 
     unit = relationship("Unit", back_populates="occupants")

@@ -1,8 +1,11 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 from decimal import Decimal
-from models import UnitType, TransactionType, TransactionCategory
+try:
+    from backend.models import UnitType, TransactionType, TransactionCategory
+except ImportError:
+    from models import UnitType, TransactionType, TransactionCategory
 
 # --- Units ---
 class UnitBase(BaseModel):
@@ -19,12 +22,17 @@ class UnitOut(UnitBase):
 class OccupantBase(BaseModel):
     name: str
     monthly_maintenance_fee: Decimal
+    car_count: int = 1
+    extra_car_maintenance_fee: Decimal = Decimal('0.00')
 
 class OccupantOut(OccupantBase):
     id: int
     unit: UnitOut
     last_paid_month: Optional[datetime] = None
     expected_dues: Decimal = Decimal('0.00') # Dynamically calculated field
+    extra_cars: int = 0
+    extra_car_charges: Decimal = Decimal('0.00')
+    total_monthly_maintenance: Decimal = Decimal('0.00')
 
     class Config:
         from_attributes = True
@@ -51,3 +59,8 @@ class DashboardMetrics(BaseModel):
     treasury_balance: Decimal
     total_overdues: Decimal
     ad_revenue: Decimal
+
+
+class OccupantCarUpdate(BaseModel):
+    car_count: int
+    extra_car_maintenance_fee: Decimal
