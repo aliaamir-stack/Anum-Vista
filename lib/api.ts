@@ -1,21 +1,16 @@
 import type {
   CreateTransactionPayload,
   DashboardMetricsResponse,
+  ExpenseDescription,
+  MonthlyReportResponse,
   Occupant,
-<<<<<<< HEAD
-  ReceiptPayload,
-  ReceiptResponse,
-  Transaction,
-} from "./types";
-import { FRONTEND_API_BASE } from "./config";
-
-const API_BASE_URL = FRONTEND_API_BASE;
-=======
+  TreasuryCurrentResponse,
   Transaction,
 } from "./types";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
+// FastAPI backend base URL (should include `/api`).
+// Example: http://localhost:8000/api
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api";
 
 const buildUrl = (path: string): string => `${API_BASE_URL}${path}`;
 
@@ -39,7 +34,6 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-<<<<<<< HEAD
 const withQuery = (
   path: string,
   params?: Record<string, string | number | undefined>,
@@ -61,38 +55,24 @@ export const api = {
 
   getTransactions: (): Promise<Transaction[]> =>
     fetchJson<Transaction[]>("/transactions"),
-=======
-export const api = {
-  getDashboardMetrics: (): Promise<DashboardMetricsResponse> =>
-    fetchJson<DashboardMetricsResponse>("/api/dashboard/metrics"),
-
-  getTenants: (): Promise<Occupant[]> => fetchJson<Occupant[]>("/api/tenants"),
-
-  getTransactions: (): Promise<Transaction[]> =>
-    fetchJson<Transaction[]>("/api/transactions"),
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
 
   createTransaction: (payload: CreateTransactionPayload): Promise<Transaction> => {
     if (!payload.date.includes("T")) {
       throw new Error("Transaction date must be a full ISO datetime string.");
     }
 
-<<<<<<< HEAD
     return fetchJson<Transaction>("/transactions", {
-=======
-    return fetchJson<Transaction>("/api/transactions", {
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
       method: "POST",
       body: JSON.stringify(payload),
     });
   },
-<<<<<<< HEAD
 
-  createReceipt: (payload: ReceiptPayload): Promise<ReceiptResponse> =>
-    fetchJson<ReceiptResponse>("/receipts", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
-=======
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
+  getMonthlyReport: (year: number, month: number): Promise<MonthlyReportResponse> =>
+    fetchJson<MonthlyReportResponse>(withQuery("/reports/monthly", { year, month })),
+
+  getTreasuryCurrent: (): Promise<TreasuryCurrentResponse> =>
+    fetchJson<TreasuryCurrentResponse>("/treasury/current"),
+
+  getExpenseDescriptions: (): Promise<ExpenseDescription[]> =>
+    fetchJson<ExpenseDescription[]>("/expense-descriptions"),
 };

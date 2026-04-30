@@ -36,6 +36,7 @@ const categoryBadgeStyles: Record<TransactionCategory, React.CSSProperties> = {
 const typeBadgeStyles: Record<TransactionType, React.CSSProperties> = {
   INFLOW: { backgroundColor: "#dcfce7", color: "#16a34a" },
   OUTFLOW: { backgroundColor: "#fee2e2", color: "#dc2626" },
+  TRANSFER: { backgroundColor: "#e0f2fe", color: "#0369a1" },
 };
 
 const formatAmount = (value: string): string =>
@@ -178,7 +179,6 @@ export default function TransactionsPage() {
         type,
         category,
         occupant_id: occupantId ? Number(occupantId) : undefined,
-        receipt_no: receiptNo || undefined,
         notes: notes || undefined,
       };
 

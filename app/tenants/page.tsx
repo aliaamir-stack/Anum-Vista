@@ -1,115 +1,91 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-<<<<<<< HEAD
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { api } from "@/lib/api";
 import type { Occupant } from "@/lib/types";
 
-const monthOptions = [
-  "2026-01",
-  "2026-02",
-  "2026-03",
-  "2026-04",
-  "2026-05",
-  "2026-06",
-  "2026-07",
-  "2026-08",
-  "2026-09",
-  "2026-10",
-  "2026-11",
-  "2026-12",
-];
+const monthLabels = [
+  { label: "January", value: "01" },
+  { label: "February", value: "02" },
+  { label: "March", value: "03" },
+  { label: "April", value: "04" },
+  { label: "May", value: "05" },
+  { label: "June", value: "06" },
+  { label: "July", value: "07" },
+  { label: "August", value: "08" },
+  { label: "September", value: "09" },
+  { label: "October", value: "10" },
+  { label: "November", value: "11" },
+  { label: "December", value: "12" },
+] as const;
 
 const formatAmount = (value: string): string =>
   `₨ ${Number(value).toLocaleString("en-PK", { maximumFractionDigits: 0 })}`;
 
+const toMonthKey = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+const parseBackendDate = (value: string | null): Date | null => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
 const prettyMonth = (value: string): string => {
-  const [year, month] = value.split("-");
-  return new Date(Number(year), Number(month) - 1, 1).toLocaleDateString("en-US", {
+  const [year, month] = value.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("en-US", {
     month: "long",
-=======
-import type { Occupant, Transaction } from "@/lib/types";
-
-const TENANTS_URL = "http://localhost:8000/api/tenants";
-const TRANSACTIONS_URL = "http://localhost:8000/api/transactions";
-
-type PaymentStatus = "paid" | "overdue" | "never_paid";
-type UnitKind = "Residential" | "Shop";
-type UnitFilter = "ALL" | UnitKind;
-type YearPaymentStatus = "fully_paid" | "partial" | "no_payment";
-type StatusFilter = "ALL" | PaymentStatus | YearPaymentStatus;
-type TenantTab = "OVERVIEW" | 2023 | 2024 | 2025 | 2026;
-
-const tenantTabs: TenantTab[] = ["OVERVIEW", 2023, 2024, 2025, 2026];
-
-const badgeBaseStyle: React.CSSProperties = {
-  borderRadius: 9999,
-  padding: "4px 12px",
-  fontSize: "0.75rem",
-  fontWeight: 600,
-  display: "inline-block",
-};
-
-const statusBadgeStyles: Record<PaymentStatus, React.CSSProperties> = {
-  paid: { backgroundColor: "#dcfce7", color: "#16a34a" },
-  overdue: { backgroundColor: "#ffedd5", color: "#ea580c" },
-  never_paid: { backgroundColor: "#fee2e2", color: "#dc2626" },
-};
-
-const unitBadgeStyles: Record<UnitKind, React.CSSProperties> = {
-  Residential: { backgroundColor: "#dbeafe", color: "#2563eb" },
-  Shop: { backgroundColor: "#f3e8ff", color: "#9333ea" },
-};
-
-const formatAmount = (value: string): string =>
-  `₨ ${parseFloat(value).toLocaleString()}`;
-
-const parseMonthString = (value: string): Date | null => {
-  const [yearStr, monthStr] = value.split("-");
-  const year = Number(yearStr);
-  const month = Number(monthStr);
-  if (!year || !month || month < 1 || month > 12) return null;
-  return new Date(year, month - 1, 1);
-};
-
-const formatLastPaid = (value: string | null): string => {
-  if (!value) return "Never";
-  const parsed = parseMonthString(value);
-  if (!parsed) return "Never";
-
-  return parsed.toLocaleDateString("en-US", {
-    month: "short",
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
     year: "numeric",
   });
 };
 
-<<<<<<< HEAD
-const getTenantStatus = (tenant: Occupant): "Overdue" | "Settled" => {
-  if (tenant.status === "Overdue" || tenant.status === "Settled") return tenant.status;
+const computeTenantStatus = (tenant: Occupant): "Overdue" | "Settled" => {
   const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  return tenant.last_paid_month === currentMonth ? "Settled" : "Overdue";
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastPaid = parseBackendDate(tenant.last_paid_month);
+  if (!lastPaid) return "Overdue";
+  const paidMonth = new Date(lastPaid.getFullYear(), lastPaid.getMonth(), 1);
+  return paidMonth >= currentMonth ? "Settled" : "Overdue";
 };
 
-const getDueMonth = (tenant: Occupant): string => {
-  if (tenant.due_month) return tenant.due_month;
-  const paid = tenant.last_paid_month;
-  if (!paid) return `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-  const [year, month] = paid.split("-").map(Number);
-  const next = new Date(year, month, 1);
-  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+const computeUnpaidPastMonths = (tenant: Occupant): string[] => {
+  const now = new Date();
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastPaid = parseBackendDate(tenant.last_paid_month);
+
+  // If never paid, show current month as due (and treat previous months as unknown).
+  if (!lastPaid) return [toMonthKey(currentMonth)];
+
+  const paidMonth = new Date(lastPaid.getFullYear(), lastPaid.getMonth(), 1);
+  const months: string[] = [];
+  const cursor = new Date(paidMonth.getFullYear(), paidMonth.getMonth() + 1, 1);
+  while (cursor <= currentMonth) {
+    months.push(toMonthKey(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
+};
+
+const RENTAL_APARTMENTS = new Set([102, 202, 204, 402, 501, 504, 604, 704, 802, 804, 1003]);
+
+const getApartmentNumeric = (unitNo: string): number | null => {
+  const match = unitNo.match(/\d+/g);
+  if (!match) return null;
+  const numeric = Number(match.join(""));
+  return Number.isFinite(numeric) ? numeric : null;
 };
 
 export default function TenantsPage() {
   const queryClient = useQueryClient();
   const [expandedTenantId, setExpandedTenantId] = useState<number | null>(null);
-  const [selectedTenant, setSelectedTenant] = useState<Occupant | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "OVERDUE" | "SETTLED">("ALL");
+
+  const [selectedTenant, setSelectedTenant] = useState<Occupant | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [generatedBy, setGeneratedBy] = useState<"Naveed" | "Dilshad" | "System">("System");
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(
     null,
   );
@@ -119,13 +95,14 @@ export default function TenantsPage() {
     queryFn: api.getTenants,
   });
 
-  const createReceiptMutation = useMutation({
-    mutationFn: api.createReceipt,
+  const createMaintenanceReceipt = useMutation({
+    mutationFn: api.createTransaction,
     onSuccess: () => {
-      setToast({ type: "success", message: "Receipt generated successfully." });
+      setToast({ type: "success", message: "Receipt generated (maintenance inflow recorded)." });
       setSelectedTenant(null);
       setSelectedMonth("");
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
     onError: (err) => {
       setToast({
@@ -135,26 +112,37 @@ export default function TenantsPage() {
     },
   });
 
-  const monthChoices = useMemo(() => {
-    if (!selectedTenant) return [];
-    const paidMonths = new Set(selectedTenant.paidMonths ?? selectedTenant.paid_months ?? []);
-    return monthOptions.filter((month) => !paidMonths.has(month));
-  }, [selectedTenant]);
-
   const filteredTenants = useMemo(() => {
     const query = search.trim().toLowerCase();
     return tenants.filter((tenant) => {
-      const name = tenant.name.toLowerCase();
-      const unit = tenant.unit.unit_no.toLowerCase();
-      const status = getTenantStatus(tenant);
-      const matchesSearch = query.length === 0 || name.includes(query) || unit.includes(query);
+      const matchesSearch =
+        query.length === 0 ||
+        tenant.name.toLowerCase().includes(query) ||
+        tenant.unit.unit_no.toLowerCase().includes(query);
+
+      const status = computeTenantStatus(tenant);
       const matchesStatus =
         statusFilter === "ALL" ||
         (statusFilter === "OVERDUE" && status === "Overdue") ||
         (statusFilter === "SETTLED" && status === "Settled");
+
       return matchesSearch && matchesStatus;
     });
   }, [search, statusFilter, tenants]);
+
+  const availableMonths = useMemo(() => {
+    if (!selectedTenant) return [];
+    const lastPaid = parseBackendDate(selectedTenant.last_paid_month);
+    const current = new Date();
+    const year = current.getFullYear();
+    const lastPaidKey = lastPaid ? toMonthKey(new Date(lastPaid.getFullYear(), lastPaid.getMonth(), 1)) : null;
+
+    return monthLabels.map((month) => {
+      const monthKey = `${year}-${month.value}`;
+      const disabled = lastPaidKey ? monthKey <= lastPaidKey : false;
+      return { ...month, year, monthKey, disabled };
+    });
+  }, [selectedTenant]);
 
   useEffect(() => {
     if (!toast) return;
@@ -165,168 +153,13 @@ export default function TenantsPage() {
   return (
     <section className="space-y-6">
       <div>
-        <h2 className="text-3xl font-semibold text-slate-900">Tenants & Collections</h2>
+        <h2 className="text-3xl font-semibold text-slate-900">Residents & Collections</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Expand each tenant to review dues and generate receipts instantly.
-=======
-const getStatus = (value: string | null): PaymentStatus => {
-  if (!value) return "never_paid";
-
-  const parsed = parseMonthString(value);
-  if (!parsed) return "never_paid";
-
-  const now = new Date();
-  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  if (parsed.getTime() === currentMonth.getTime()) return "paid";
-  if (parsed < currentMonth) return "overdue";
-  return "paid";
-};
-
-const getUnitKind = (unitType: string): UnitKind =>
-  unitType.toLowerCase() === "shop" ? "Shop" : "Residential";
-
-const getYearlyStatus = (totalPaid: number, monthlyFee: number): YearPaymentStatus => {
-  const yearlyExpected = monthlyFee * 12;
-  if (totalPaid >= yearlyExpected) return "fully_paid";
-  if (totalPaid > 0) return "partial";
-  return "no_payment";
-};
-
-const yearlyStatusBadgeStyles: Record<YearPaymentStatus, React.CSSProperties> = {
-  fully_paid: { backgroundColor: "#dcfce7", color: "#16a34a" },
-  partial: { backgroundColor: "#ffedd5", color: "#ea580c" },
-  no_payment: { backgroundColor: "#fee2e2", color: "#dc2626" },
-};
-
-export default function TenantsPage() {
-  const [tenants, setTenants] = useState<Occupant[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [unitFilter, setUnitFilter] = useState<UnitFilter>("ALL");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
-  const [activeTab, setActiveTab] = useState<TenantTab>("OVERVIEW");
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const [tenantsRes, transactionsRes] = await Promise.all([
-          fetch(TENANTS_URL, {
-            method: "GET",
-            cache: "no-store",
-            signal: controller.signal,
-          }),
-          fetch(TRANSACTIONS_URL, {
-            method: "GET",
-            cache: "no-store",
-            signal: controller.signal,
-          }),
-        ]);
-
-        if (!tenantsRes.ok) {
-          throw new Error(`Failed to fetch tenants (${tenantsRes.status})`);
-        }
-        if (!transactionsRes.ok) {
-          throw new Error(
-            `Failed to fetch transactions (${transactionsRes.status})`,
-          );
-        }
-
-        const tenantsData = (await tenantsRes.json()) as Occupant[];
-        const transactionsData = (await transactionsRes.json()) as Transaction[];
-
-        setTenants(tenantsData);
-        setTransactions(transactionsData);
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          setError((err as Error).message || "Failed to load tenants.");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadData();
-    return () => controller.abort();
-  }, []);
-
-  const filteredRows = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-
-    return tenants
-      .map((tenant) => {
-        const unitKind = getUnitKind(tenant.unit.type);
-        const status = getStatus(tenant.last_paid_month);
-        const monthlyFee = parseFloat(tenant.monthly_maintenance_fee);
-
-        if (activeTab === "OVERVIEW") {
-          return {
-            tenant,
-            unitKind,
-            monthlyFee,
-            overviewStatus: status,
-            yearlyTotal: null as number | null,
-            yearlyStatus: null as YearPaymentStatus | null,
-          };
-        }
-
-        const yearlyTotal = transactions
-          .filter((tx) => {
-            if (tx.occupant_id !== tenant.id) return false;
-            if (tx.type !== "INFLOW") return false;
-            const year = new Date(tx.date).getFullYear();
-            return year === activeTab;
-          })
-          .reduce((sum, tx) => sum + parseFloat(tx.amount), 0);
-
-        const yearlyStatus = getYearlyStatus(yearlyTotal, monthlyFee);
-        return {
-          tenant,
-          unitKind,
-          monthlyFee,
-          overviewStatus: status,
-          yearlyTotal,
-          yearlyStatus,
-        };
-      })
-      .filter((row) => {
-        const tenant = row.tenant;
-      const unitKind = getUnitKind(tenant.unit.type);
-
-      const matchesSearch =
-        query.length === 0 ||
-        tenant.name.toLowerCase().includes(query) ||
-        tenant.unit.unit_no.toLowerCase().includes(query);
-      const matchesUnit = unitFilter === "ALL" || unitKind === unitFilter;
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        (activeTab === "OVERVIEW"
-          ? row.overviewStatus === statusFilter
-          : row.yearlyStatus === statusFilter);
-
-      return matchesSearch && matchesUnit && matchesStatus;
-    });
-  }, [tenants, transactions, searchQuery, unitFilter, statusFilter, activeTab]);
-
-  return (
-    <section className="space-y-6 p-8">
-      <div>
-        <h2 className="text-2xl font-semibold text-slate-900">Tenants & Shops</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          {isLoading ? "Loading occupants..." : `${tenants.length} total count`}
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
+          Expand residents, review dues, and generate maintenance receipts (FastAPI).
         </p>
       </div>
 
       {error ? (
-<<<<<<< HEAD
         <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {(error as Error).message}
         </div>
@@ -353,99 +186,17 @@ export default function TenantsPage() {
                   type="button"
                   onClick={() => setStatusFilter(option.id as "ALL" | "OVERDUE" | "SETTLED")}
                   className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                    active
-                      ? "bg-slate-900 text-white"
-                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    active ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                   }`}
                 >
                   {option.label}
                 </button>
               );
             })}
-=======
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          {error}
-        </div>
-      ) : null}
-
-      <div className="rounded-xl bg-white p-6 shadow-md">
-        <div className="mb-4 flex flex-wrap gap-2">
-          {tenantTabs.map((tab) => {
-            const isActive = activeTab === tab;
-            return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => {
-                  setActiveTab(tab);
-                  setStatusFilter("ALL");
-                }}
-                className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                  isActive
-                    ? "bg-[#1e2a3a] text-white"
-                    : "bg-white text-slate-600 hover:bg-slate-100"
-                }`}
-                style={!isActive ? { border: "1px solid #e2e8f0" } : undefined}
-              >
-                {tab === "OVERVIEW" ? "Overview" : tab}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Search</label>
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Type</label>
-            <select
-              value={unitFilter}
-              onChange={(e) => setUnitFilter(e.target.value as UnitFilter)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
-            >
-              <option value="ALL">All</option>
-              <option value="Residential">Residential</option>
-              <option value="Shop">Shop</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Status</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500"
-            >
-              <option value="ALL">All</option>
-              {activeTab === "OVERVIEW" ? (
-                <>
-                  <option value="paid">Paid</option>
-                  <option value="overdue">Overdue</option>
-                  <option value="never_paid">Never Paid</option>
-                </>
-              ) : (
-                <>
-                  <option value="fully_paid">Fully Paid</option>
-                  <option value="partial">Partial</option>
-                  <option value="no_payment">No Payment</option>
-                </>
-              )}
-            </select>
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
           </div>
         </div>
       </div>
 
-<<<<<<< HEAD
       {isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, index) => (
@@ -455,24 +206,40 @@ export default function TenantsPage() {
       ) : (
         <div className="space-y-3">
           {filteredTenants.map((tenant) => {
-            const status = getTenantStatus(tenant);
+            const status = computeTenantStatus(tenant);
             const isExpanded = expandedTenantId === tenant.id;
-            const hasPastDues = tenant.hasPastDues ?? false;
-            const unpaidPastMonths = tenant.unpaidPastMonths ?? [];
+            const unpaidPastMonths = computeUnpaidPastMonths(tenant);
+            const hasPastDues = unpaidPastMonths.length > 1;
+            const unitNumber = getApartmentNumeric(tenant.unit.unit_no);
+            const isRental = unitNumber ? RENTAL_APARTMENTS.has(unitNumber) : false;
+
             return (
               <motion.article
                 key={tenant.id}
                 layout
-                className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                className={`overflow-hidden rounded-2xl border bg-white shadow-sm ${
+                  isRental ? "border-violet-200 ring-1 ring-violet-100" : "border-slate-200"
+                }`}
               >
                 <button
                   type="button"
                   onClick={() => setExpandedTenantId(isExpanded ? null : tenant.id)}
-                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-slate-50"
+                  className={`flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition ${
+                    isRental ? "hover:bg-violet-50/50" : "hover:bg-slate-50"
+                  }`}
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="text-2xl font-semibold text-slate-900">{tenant.unit.unit_no}</p>
+                      {isRental ? (
+                        <span className="rounded-full bg-violet-100 px-3 py-1 text-[11px] font-semibold text-violet-700">
+                          Rental
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                          Permanent
+                        </span>
+                      )}
                       {hasPastDues ? (
                         <span className="relative inline-flex h-3 w-3">
                           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
@@ -484,9 +251,7 @@ export default function TenantsPage() {
                   </div>
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      status === "Overdue"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-emerald-100 text-emerald-700"
+                      status === "Overdue" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"
                     }`}
                   >
                     {status}
@@ -503,23 +268,51 @@ export default function TenantsPage() {
                     >
                       <div className="grid gap-3 text-sm text-slate-600 md:grid-cols-2">
                         <p>
-                          <span className="font-semibold text-slate-800">Contact:</span>{" "}
-                          {tenant.contact ?? tenant.phone ?? tenant.email ?? "Not provided"}
-                        </p>
-                        <p>
-                          <span className="font-semibold text-slate-800">Monthly Maintenance:</span>{" "}
+                          <span className="font-semibold text-slate-800">Monthly (base):</span>{" "}
                           {formatAmount(tenant.monthly_maintenance_fee)}
                         </p>
                         <p>
-                          <span className="font-semibold text-slate-800">Current Due Month:</span>{" "}
-                          {prettyMonth(getDueMonth(tenant))}
+                          <span className="font-semibold text-slate-800">Total Monthly:</span>{" "}
+                          {tenant.total_monthly_maintenance
+                            ? formatAmount(tenant.total_monthly_maintenance)
+                            : formatAmount(tenant.monthly_maintenance_fee)}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-slate-800">Contact:</span>{" "}
+                          {tenant.contact || tenant.phone || tenant.email || "—"}
+                        </p>
+                        <p>
+                          <span className="font-semibold text-slate-800">CNIC:</span>{" "}
+                          {tenant.cnic || "—"}
+                        </p>
+                        <p className="md:col-span-2">
+                          <span className="font-semibold text-slate-800">Expected dues:</span>{" "}
+                          {formatAmount(tenant.expected_dues)}
                         </p>
                       </div>
+
+                      {isRental ? (
+                        <div className="mt-4 rounded-xl border border-violet-200 bg-violet-50 p-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-violet-700">
+                            Owner
+                          </p>
+                          <div className="mt-2 grid gap-2 text-sm text-slate-700 md:grid-cols-2">
+                            <p>
+                              <span className="font-semibold text-slate-800">Name:</span>{" "}
+                              {tenant.unit.owner_name || "—"}
+                            </p>
+                            <p>
+                              <span className="font-semibold text-slate-800">Contact:</span>{" "}
+                              {tenant.unit.owner_contact || "—"}
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
 
                       {unpaidPastMonths.length > 0 ? (
                         <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                           <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-                            Past Dues Alert
+                            Unpaid months (derived)
                           </p>
                           <div className="mt-2 flex flex-wrap gap-2">
                             {unpaidPastMonths.map((month) => (
@@ -538,11 +331,12 @@ export default function TenantsPage() {
                         type="button"
                         onClick={() => {
                           setSelectedTenant(tenant);
-                          setSelectedMonth(getDueMonth(tenant));
+                          const now = new Date();
+                          setSelectedMonth(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
                         }}
                         className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
                       >
-                        Generate Receipt
+                        Generate Receipt (Creates Transaction)
                       </button>
                     </motion.div>
                   ) : null}
@@ -550,6 +344,10 @@ export default function TenantsPage() {
               </motion.article>
             );
           })}
+
+          {!isLoading && filteredTenants.length === 0 ? (
+            <p className="text-sm text-slate-600">No tenants match your filters.</p>
+          ) : null}
         </div>
       )}
 
@@ -571,7 +369,7 @@ export default function TenantsPage() {
                 <div>
                   <h3 className="text-xl font-semibold text-slate-900">Generate Receipt</h3>
                   <p className="text-sm text-slate-500">
-                    Auto-filled details from selected tenant.
+                    This will create a FastAPI maintenance transaction.
                   </p>
                 </div>
                 <button
@@ -588,13 +386,19 @@ export default function TenantsPage() {
                 onSubmit={(event) => {
                   event.preventDefault();
                   if (!selectedMonth) {
-                    setToast({ type: "error", message: "Please select a valid unpaid month." });
+                    setToast({ type: "error", message: "Please select a month." });
                     return;
                   }
-                  createReceiptMutation.mutate({
+                  const amount =
+                    selectedTenant.total_monthly_maintenance ?? selectedTenant.monthly_maintenance_fee;
+                  createMaintenanceReceipt.mutate({
                     occupant_id: selectedTenant.id,
-                    month: selectedMonth,
-                    amount: selectedTenant.monthly_maintenance_fee,
+                    date: `${selectedMonth}-01T00:00:00`,
+                    amount,
+                    type: "INFLOW",
+                    category: "maintenance",
+                    generated_by: generatedBy,
+                    notes: `Maintenance receipt for ${prettyMonth(selectedMonth)} (${selectedTenant.unit.unit_no})`,
                   });
                 }}
               >
@@ -609,24 +413,16 @@ export default function TenantsPage() {
                       className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                     />
                   </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-                      Apartment
-                    </label>
-                    <input
-                      value={selectedTenant.unit.unit_no}
-                      readOnly
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                    />
-                  </div>
                 </div>
 
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-                    Maintenance Amount
+                    Amount
                   </label>
                   <input
-                    value={formatAmount(selectedTenant.monthly_maintenance_fee)}
+                    value={formatAmount(
+                      selectedTenant.total_monthly_maintenance ?? selectedTenant.monthly_maintenance_fee,
+                    )}
                     readOnly
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                   />
@@ -634,7 +430,7 @@ export default function TenantsPage() {
 
                 <div>
                   <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-                    Month of Maintenance
+                    Month of Maintenance (already-paid months disabled)
                   </label>
                   <select
                     required
@@ -642,23 +438,37 @@ export default function TenantsPage() {
                     onChange={(event) => setSelectedMonth(event.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
                   >
-                    {monthChoices.length === 0 ? (
-                      <option value="">No unpaid months available</option>
-                    ) : null}
-                    {monthChoices.map((month) => (
-                      <option key={month} value={month}>
-                        {prettyMonth(month)}
+                    {availableMonths.map((month) => (
+                      <option key={month.monthKey} value={month.monthKey} disabled={month.disabled}>
+                        {month.label} {month.year} {month.disabled ? "(paid)" : ""}
                       </option>
                     ))}
                   </select>
                 </div>
 
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
+                    Generated By
+                  </label>
+                  <select
+                    value={generatedBy}
+                    onChange={(event) =>
+                      setGeneratedBy(event.target.value as "Naveed" | "Dilshad" | "System")
+                    }
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-slate-500"
+                  >
+                    <option value="Naveed">Naveed</option>
+                    <option value="Dilshad">Dilshad</option>
+                    <option value="System">System</option>
+                  </select>
+                </div>
+
                 <button
                   type="submit"
-                  disabled={createReceiptMutation.isPending || monthChoices.length === 0}
+                  disabled={createMaintenanceReceipt.isPending}
                   className="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-50"
                 >
-                  {createReceiptMutation.isPending ? "Generating..." : "Submit Receipt"}
+                  {createMaintenanceReceipt.isPending ? "Generating..." : "Submit Receipt"}
                 </button>
               </form>
             </motion.div>
@@ -673,116 +483,13 @@ export default function TenantsPage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
             className={`fixed bottom-6 right-6 z-50 rounded-xl px-4 py-3 text-sm font-medium shadow-lg ${
-              toast.type === "success"
-                ? "bg-emerald-100 text-emerald-800"
-                : "bg-rose-100 text-rose-800"
+              toast.type === "success" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
             }`}
           >
             {toast.message}
           </motion.div>
         ) : null}
       </AnimatePresence>
-=======
-      <div className="overflow-hidden rounded-xl bg-white shadow-md">
-        <table className="min-w-full text-left text-sm">
-          <thead style={{ backgroundColor: "#1e2a3a", color: "#ffffff" }}>
-            <tr>
-              <th className="px-5 py-3 font-semibold">Name</th>
-              <th className="px-5 py-3 font-semibold">Unit</th>
-              <th className="px-5 py-3 font-semibold">Type</th>
-              <th className="px-5 py-3 font-semibold">Monthly Fee</th>
-              <th className="px-5 py-3 font-semibold">
-                {activeTab === "OVERVIEW" ? "Last Paid" : "Total Paid"}
-              </th>
-              <th className="px-5 py-3 font-semibold">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading
-              ? Array.from({ length: 5 }).map((_, index) => (
-                  <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                    <td className="px-5 py-4">
-                      <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="h-4 w-16 animate-pulse rounded bg-slate-200" />
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="h-6 w-20 animate-pulse rounded-full bg-slate-200" />
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="h-4 w-24 animate-pulse rounded bg-slate-200" />
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="h-4 w-20 animate-pulse rounded bg-slate-200" />
-                    </td>
-                    <td className="px-5 py-4">
-                      <div className="h-6 w-24 animate-pulse rounded-full bg-slate-200" />
-                    </td>
-                  </tr>
-                ))
-              : filteredRows.map((row, index) => {
-                  const tenant = row.tenant;
-                  const status = row.overviewStatus;
-                  const unitKind = row.unitKind;
-
-                  return (
-                    <tr
-                      key={tenant.id}
-                      className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
-                    >
-                      <td className="px-5 py-4 font-medium text-slate-800">{tenant.name}</td>
-                      <td className="px-5 py-4 text-slate-700">{tenant.unit.unit_no}</td>
-                      <td className="px-5 py-4">
-                        <span style={{ ...badgeBaseStyle, ...unitBadgeStyles[unitKind] }}>
-                          {unitKind}
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-slate-700">
-                        {formatAmount(tenant.monthly_maintenance_fee)}
-                      </td>
-                      <td className="px-5 py-4 text-slate-700">
-                        {activeTab === "OVERVIEW"
-                          ? formatLastPaid(tenant.last_paid_month)
-                          : formatAmount(String(row.yearlyTotal ?? 0))}
-                      </td>
-                      <td className="px-5 py-4">
-                        {activeTab === "OVERVIEW" ? (
-                          <span style={{ ...badgeBaseStyle, ...statusBadgeStyles[status] }}>
-                            {status === "paid"
-                              ? "Paid"
-                              : status === "overdue"
-                                ? "Overdue"
-                                : "Never Paid"}
-                          </span>
-                        ) : (
-                          <span
-                            style={{
-                              ...badgeBaseStyle,
-                              ...yearlyStatusBadgeStyles[row.yearlyStatus ?? "no_payment"],
-                            }}
-                          >
-                            {row.yearlyStatus === "fully_paid"
-                              ? "Fully Paid"
-                              : row.yearlyStatus === "partial"
-                                ? "Partial"
-                                : "No Payment"}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-          </tbody>
-        </table>
-      </div>
-
-      <p className="text-sm text-slate-600">
-        {isLoading
-          ? "Loading tenants..."
-          : `Showing ${filteredRows.length} of ${tenants.length} tenants`}
-      </p>
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
     </section>
   );
 }

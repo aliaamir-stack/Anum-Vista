@@ -1,377 +1,162 @@
 "use client";
 
-<<<<<<< HEAD
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
-import { Cell, Pie, PieChart } from "recharts";
 import { api } from "@/lib/api";
+import type { Occupant } from "@/lib/types";
 import type { DashboardMetricsResponse } from "@/lib/types";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-const monthOptions = [
-  { label: "Jan", value: "01" },
-  { label: "Feb", value: "02" },
-  { label: "Mar", value: "03" },
-  { label: "Apr", value: "04" },
-  { label: "May", value: "05" },
-  { label: "Jun", value: "06" },
-  { label: "Jul", value: "07" },
-  { label: "Aug", value: "08" },
-  { label: "Sep", value: "09" },
-  { label: "Oct", value: "10" },
-  { label: "Nov", value: "11" },
-  { label: "Dec", value: "12" },
-] as const;
+const formatPkrAmount = (value: string): string =>
+  `₨ ${Number(value).toLocaleString("en-PK", { maximumFractionDigits: 0 })}`;
 
-const parseDecimal = (value: string | number | null | undefined): number => {
-  const parsed = Number(value ?? 0);
-  return Number.isFinite(parsed) ? parsed : 0;
+const toMonthKey = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+const parseBackendDate = (value: string | null): Date | null => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-const formatPkr = (value: number): string =>
-  `₨ ${value.toLocaleString("en-PK", { maximumFractionDigits: 0 })}`;
+const prettyMonth = (value: string): string => {
+  const [year, month] = value.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+};
 
-function AnimatedCurrency({
-  value,
-  className,
-}: {
-  value: number;
-  className?: string;
-}) {
-  const [displayValue, setDisplayValue] = useState(0);
+const computeTenantStatus = (tenant: Occupant): "Overdue" | "Settled" => {
+  const now = new Date();
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastPaid = parseBackendDate(tenant.last_paid_month);
+  if (!lastPaid) return "Overdue";
+  const paidMonth = new Date(lastPaid.getFullYear(), lastPaid.getMonth(), 1);
+  return paidMonth >= currentMonth ? "Settled" : "Overdue";
+};
 
-  useEffect(() => {
-    const durationMs = 900;
-    const start = performance.now();
-    const initial = displayValue;
-    let frame = 0;
+const computeUnpaidPastMonths = (tenant: Occupant): string[] => {
+  const now = new Date();
+  const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastPaid = parseBackendDate(tenant.last_paid_month);
+  if (!lastPaid) return [toMonthKey(currentMonth)];
 
-    const tick = (now: number) => {
-      const progress = Math.min((now - start) / durationMs, 1);
-      const next = initial + (value - initial) * progress;
-      setDisplayValue(next);
-      if (progress < 1) frame = requestAnimationFrame(tick);
-    };
-
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [value]);
-
-  return (
-    <motion.p
-      className={className}
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
-      {formatPkr(displayValue)}
-    </motion.p>
-  );
-}
-
-const normalizeMetrics = (metrics: DashboardMetricsResponse) => {
-  const source = metrics as DashboardMetricsResponse & {
-    overdue_apartments?: string[];
-    overdueApartmentNumbers?: string[];
-    maintenance_progress?: {
-      received?: string;
-      expected?: string;
-    };
-  };
-
-  return {
-    totalRevenue: parseDecimal(source.totalRevenue ?? source.total_revenue),
-    overdueAmount: parseDecimal(source.totalOverdueAmount ?? source.total_overdues),
-    treasuryBalance: parseDecimal(source.treasuryBalance ?? source.treasury_balance),
-    adRevenue: parseDecimal(source.allTimeAdRevenue ?? source.ad_revenue),
-    overdueUnits:
-      source.missingApartments ??
-      source.overdue_units ??
-      source.overdue_apartments ??
-      source.overdueApartmentNumbers ??
-      [],
-    maintenanceReceived: parseDecimal(
-      source.maintenanceReceivedThisMonth ??
-        source.maintenance_received ??
-        source.maintenance_progress?.received,
-    ),
-    maintenanceExpected: parseDecimal(
-      source.maintenanceExpectedTotal ??
-        source.total_expected_maintenance ??
-        source.maintenance_progress?.expected,
-    ),
-  };
+  const paidMonth = new Date(lastPaid.getFullYear(), lastPaid.getMonth(), 1);
+  const months: string[] = [];
+  const cursor = new Date(paidMonth.getFullYear(), paidMonth.getMonth() + 1, 1);
+  while (cursor <= currentMonth) {
+    months.push(toMonthKey(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
 };
 
 export default function DashboardPage() {
-  const now = new Date();
-  const [selectedMonth, setSelectedMonth] = useState(
-    String(now.getMonth() + 1).padStart(2, "0"),
-  );
-  const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
-  const yearOptions = [String(now.getFullYear()), String(now.getFullYear() - 1)];
+  const [overdueOpen, setOverdueOpen] = useState(false);
 
   const {
     data: metrics,
     isLoading,
-    isFetching,
     error,
   } = useQuery({
-    queryKey: ["dashboard-metrics", selectedMonth, selectedYear],
-    queryFn: () => api.getDashboardMetrics(selectedMonth, selectedYear),
+    queryKey: ["dashboard-metrics"],
+    queryFn: () => api.getDashboardMetrics(),
   });
 
-  const normalized = useMemo(
-    () =>
-      normalizeMetrics(
-        metrics ?? {
-          total_revenue: "0",
-          total_overdues: "0",
-          treasury_balance: "0",
-          ad_revenue: "0",
-        },
-      ),
-    [metrics],
-  );
+  const { data: tenants = [] } = useQuery({
+    queryKey: ["tenants"],
+    queryFn: api.getTenants,
+  });
 
-  const progressRatio =
-    normalized.maintenanceExpected > 0
-      ? Math.min(normalized.maintenanceReceived / normalized.maintenanceExpected, 1)
-      : 0;
+  const { data: transactions = [] } = useQuery({
+    queryKey: ["transactions"],
+    queryFn: api.getTransactions,
+  });
 
-  const progressData = [
-    { name: "Received", value: progressRatio * 100, color: "#2563eb" },
-    { name: "Pending", value: 100 - progressRatio * 100, color: "#e2e8f0" },
-  ];
+  const overdueResidents = useMemo(() => {
+    return tenants
+      .map((tenant) => {
+        const status = computeTenantStatus(tenant);
+        if (status !== "Overdue") return null;
+        const unpaid = computeUnpaidPastMonths(tenant);
+        const dueMonth = unpaid[0] ?? toMonthKey(new Date());
+        return {
+          id: tenant.id,
+          name: tenant.name,
+          unit: tenant.unit.unit_no,
+          dueMonth,
+          remainingDue: tenant.expected_dues,
+        };
+      })
+      .filter(Boolean) as Array<{
+      id: number;
+      name: string;
+      unit: string;
+      dueMonth: string;
+      remainingDue: string;
+    }>;
+  }, [tenants]);
 
-  const revenueMonth = `${selectedYear}-${selectedMonth}`;
+  const currentYear = new Date().getFullYear();
+  const monthTicks = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-  return (
-    <section className="space-y-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-semibold text-slate-900">Financial Dashboard</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Live accounting overview with animated performance indicators.
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Month
-              </label>
-              <select
-                value={selectedMonth}
-                onChange={(event) => setSelectedMonth(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
-              >
-                {monthOptions.map((month) => (
-                  <option key={month.value} value={month.value}>
-                    {month.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Year
-              </label>
-              <select
-                value={selectedYear}
-                onChange={(event) => setSelectedYear(event.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-500"
-              >
-                {yearOptions.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
+  const cashflowSeries = useMemo(() => {
+    const byMonth = Array.from({ length: 12 }).map((_, index) => ({
+      month: monthTicks[index],
+      inflow: 0,
+      outflow: 0,
+    }));
+    transactions.forEach((tx) => {
+      const date = new Date(tx.date);
+      if (Number.isNaN(date.getTime())) return;
+      if (date.getFullYear() !== currentYear) return;
+      const m = date.getMonth();
+      const amount = Number(tx.amount);
+      if (!Number.isFinite(amount)) return;
+      if (tx.type === "INFLOW") byMonth[m].inflow += amount;
+      else byMonth[m].outflow += amount;
+    });
+    return byMonth;
+  }, [transactions, currentYear]);
 
-      {error ? (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {(error as Error).message}
-        </div>
-      ) : null}
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-        <motion.article
-          whileHover={{ y: -3 }}
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-4"
-        >
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Total Revenue ({revenueMonth})
-          </p>
-          {isLoading ? (
-            <div className="mt-4 h-10 w-2/3 animate-pulse rounded bg-slate-200" />
-          ) : (
-            <AnimatePresence mode="wait">
-              <motion.div key={selectedMonth} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                <AnimatedCurrency value={normalized.totalRevenue} className="mt-3 text-3xl font-bold text-emerald-600" />
-              </motion.div>
-            </AnimatePresence>
-          )}
-          {isFetching && !isLoading ? (
-            <p className="mt-2 text-xs text-slate-400">Refreshing metric...</p>
-          ) : null}
-        </motion.article>
-
-        <motion.article
-          whileHover={{ y: -3 }}
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-4"
-        >
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Overdue Tracker
-          </p>
-          {isLoading ? (
-            <div className="mt-4 h-10 w-1/2 animate-pulse rounded bg-slate-200" />
-          ) : (
-            <AnimatedCurrency value={normalized.overdueAmount} className="mt-3 text-3xl font-bold text-rose-600" />
-          )}
-          <div className="mt-4 max-h-28 space-y-2 overflow-y-auto rounded-xl bg-slate-50 p-3">
-            {normalized.overdueUnits.length === 0 ? (
-              <p className="text-sm text-slate-500">No overdue apartments.</p>
-            ) : (
-              normalized.overdueUnits.map((unit) => (
-                <p key={unit} className="rounded-md bg-white px-2 py-1 text-xs font-medium text-slate-700">
-                  {unit}
-                </p>
-              ))
-            )}
-          </div>
-        </motion.article>
-
-        <motion.article
-          whileHover={{ y: -3 }}
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-4"
-        >
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Treasury Balance
-          </p>
-          {isLoading ? (
-            <div className="mt-4 h-10 w-2/3 animate-pulse rounded bg-slate-200" />
-          ) : (
-            <AnimatedCurrency value={normalized.treasuryBalance} className="mt-3 text-3xl font-bold text-sky-700" />
-          )}
-        </motion.article>
-
-        <motion.article
-          whileHover={{ y: -3 }}
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-4"
-        >
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Ad Revenue (Lifetime)
-          </p>
-          {isLoading ? (
-            <div className="mt-4 h-10 w-1/2 animate-pulse rounded bg-slate-200" />
-          ) : (
-            <AnimatedCurrency value={normalized.adRevenue} className="mt-3 text-3xl font-bold text-violet-600" />
-          )}
-        </motion.article>
-
-        <motion.article
-          whileHover={{ y: -3 }}
-          className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-8"
-        >
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Maintenance Progress
-          </p>
-          <div className="mt-4 grid grid-cols-1 items-center gap-4 md:grid-cols-2">
-            <div className="h-48">
-              <PieChart width={220} height={180}>
-                <Pie
-                  data={progressData}
-                  dataKey="value"
-                  innerRadius={50}
-                  outerRadius={70}
-                  strokeWidth={0}
-                  cx={100}
-                  cy={85}
-                >
-                  {progressData.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </div>
-            <div className="space-y-3">
-              <p className="text-sm text-slate-600">
-                Received vs expected maintenance for the selected month.
-              </p>
-              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressRatio * 100}%` }}
-                  transition={{ duration: 0.8 }}
-                  className="h-full rounded-full bg-sky-600"
-                />
-              </div>
-              <p className="text-sm font-semibold text-slate-700">
-                {(progressRatio * 100).toFixed(1)}% completed
-              </p>
-              <p className="text-xs text-slate-500">
-                {formatPkr(normalized.maintenanceReceived)} / {formatPkr(normalized.maintenanceExpected)}
-              </p>
-            </div>
-          </div>
-        </motion.article>
-=======
-import { useEffect, useState } from "react";
-import type { DashboardMetricsResponse } from "@/lib/types";
-
-const METRICS_URL = "http://localhost:8000/api/dashboard/metrics";
-
-const formatPkrAmount = (value: string): string =>
-  `₨ ${parseFloat(value).toLocaleString("en-PK")}`;
-
-export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<DashboardMetricsResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    const loadMetrics = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const response = await fetch(METRICS_URL, {
-          method: "GET",
-          cache: "no-store",
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          let message = `Failed to fetch metrics (${response.status})`;
-          try {
-            const errorBody = (await response.json()) as { message?: string };
-            if (errorBody.message) message = errorBody.message;
-          } catch {
-            // Ignore JSON parse errors and keep default message.
-          }
-          throw new Error(message);
-        }
-
-        const data = (await response.json()) as DashboardMetricsResponse;
-        setMetrics(data);
-      } catch (err) {
-        if ((err as Error).name !== "AbortError") {
-          setError((err as Error).message || "Failed to load dashboard metrics.");
-        }
-      } finally {
-        setIsLoading(false);
-      }
+  const categoryBreakdown = useMemo(() => {
+    const map = new Map<string, number>();
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    transactions.forEach((tx) => {
+      const date = new Date(tx.date);
+      if (Number.isNaN(date.getTime())) return;
+      if (date.getFullYear() !== currentYear) return;
+      if (date.getMonth() !== currentMonth) return;
+      const amount = Number(tx.amount);
+      if (!Number.isFinite(amount)) return;
+      map.set(tx.category, (map.get(tx.category) ?? 0) + amount * (tx.type === "OUTFLOW" ? -1 : 1));
+    });
+    const colors: Record<string, string> = {
+      maintenance: "#2563eb",
+      expense: "#dc2626",
+      ad_revenue: "#9333ea",
+      other: "#64748b",
     };
-
-    loadMetrics();
-    return () => controller.abort();
-  }, []);
+    return Array.from(map.entries())
+      .map(([name, value]) => ({ name, value: Math.abs(value), fill: colors[name] ?? "#64748b" }))
+      .filter((entry) => entry.value > 0);
+  }, [transactions, currentYear]);
 
   const cards = metrics
     ? [
@@ -392,6 +177,7 @@ export default function DashboardPage() {
           value: formatPkrAmount(metrics.total_overdues),
           borderColor: "#dc2626",
           valueColor: "#dc2626",
+          interactive: true,
         },
         {
           title: "Ad Revenue (all time)",
@@ -413,7 +199,7 @@ export default function DashboardPage() {
 
       {error ? (
         <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
+          {(error as Error).message}
         </div>
       ) : null}
 
@@ -434,13 +220,115 @@ export default function DashboardPage() {
                 className="bg-white rounded-xl shadow-md p-6 border-l-4"
                 style={{ borderLeftColor: card.borderColor }}
               >
-                <p className="text-sm text-gray-500 mb-1">{card.title}</p>
-                <p className="text-2xl font-bold" style={{ color: card.valueColor }}>
-                  {card.value}
-                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (card.title === "Total Overdues") setOverdueOpen((v) => !v);
+                  }}
+                  className={`w-full text-left ${card.title === "Total Overdues" ? "cursor-pointer" : "cursor-default"}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm text-gray-500 mb-1">{card.title}</p>
+                    {card.title === "Total Overdues" ? (
+                      <span className="text-xs font-semibold text-slate-400">
+                        {overdueOpen ? "Hide" : "View"}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-2xl font-bold" style={{ color: card.valueColor }}>
+                    {card.value}
+                  </p>
+                </button>
+
+                {card.title === "Total Overdues" ? (
+                  <AnimatePresence>
+                    {overdueOpen ? (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-4 overflow-hidden rounded-lg border border-rose-100 bg-rose-50/40"
+                      >
+                        <div className="max-h-64 overflow-y-auto p-3">
+                          {overdueResidents.length === 0 ? (
+                            <p className="text-sm text-slate-600">No overdue residents.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {overdueResidents.map((resident) => (
+                                <div
+                                  key={resident.id}
+                                  className="rounded-lg bg-white px-3 py-2 text-sm"
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <p className="font-semibold text-slate-900">
+                                      {resident.unit}
+                                    </p>
+                                    <p className="font-semibold text-rose-700">
+                                      {formatPkrAmount(resident.remainingDue)}
+                                    </p>
+                                  </div>
+                                  <p className="text-xs text-slate-500">
+                                    Due: {prettyMonth(resident.dueMonth)} • {resident.name}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
+                ) : null}
               </article>
             ))}
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Cashflow Trend (This Year)
+              </p>
+              <p className="text-sm text-slate-600">Monthly inflow vs outflow</p>
+            </div>
+          </div>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={cashflowSeries}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="inflow" stroke="#16a34a" strokeWidth={2} />
+                <Line type="monotone" dataKey="outflow" stroke="#dc2626" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="lg:col-span-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Category Breakdown (This Month)
+          </p>
+          <p className="text-sm text-slate-600">Absolute totals by category</p>
+          <div className="mt-4 h-72">
+            {categoryBreakdown.length === 0 ? (
+              <div className="flex h-full items-center justify-center rounded-xl bg-slate-50 text-sm text-slate-500">
+                Not enough data yet.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={categoryBreakdown} dataKey="value" nameKey="name" outerRadius={90} />
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
       </div>
     </section>
   );

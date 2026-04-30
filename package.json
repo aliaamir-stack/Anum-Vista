@@ -3,28 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-<<<<<<< HEAD
-    "dev": "next dev --webpack",
-=======
     "dev": "next dev",
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
   },
   "dependencies": {
-<<<<<<< HEAD
     "@tanstack/react-query": "^5.100.5",
     "framer-motion": "^12.38.0",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
     "recharts": "^3.8.1"
-=======
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest"
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
   },
   "devDependencies": {
     "@tailwindcss/postcss": "latest",

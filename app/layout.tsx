@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
-<<<<<<< HEAD
 import { Providers } from "./providers";
-=======
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
 
 export const metadata: Metadata = {
   title: "Anum Vista",
@@ -13,8 +10,10 @@ export const metadata: Metadata = {
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/tenants", label: "Tenants" },
-  { href: "/transactions", label: "Transactions" },
+  { href: "/analytics", label: "Monthly Analytics" },
+  { href: "/treasury", label: "Treasury" },
+  { href: "/tenants", label: "Residents" },
+  { href: "/transactions", label: "Expenses" },
 ];
 
 export default function RootLayout({
@@ -26,7 +25,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen bg-[#f5f6fa] text-slate-900 antialiased">
         <div className="flex min-h-screen">
-          <aside className="w-[240px] shrink-0 bg-[#1e2a3a] text-white">
+          <aside className="sticky top-0 h-screen w-[240px] shrink-0 overflow-y-auto bg-[#1e2a3a] text-white">
             <div className="border-b border-white/10 px-6 py-6">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">
                 Anum Vista
@@ -53,11 +52,7 @@ export default function RootLayout({
           </aside>
 
           <main className="min-h-screen flex-1 bg-[#f5f6fa] p-8">
-<<<<<<< HEAD
             <Providers>{children}</Providers>
-=======
-            {children}
->>>>>>> 933b7a9bb429ac032addf003d19bbc13bbdb98a9
           </main>
         </div>
       </body>
